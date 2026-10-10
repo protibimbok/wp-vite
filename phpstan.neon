@@ -8,3 +8,5 @@ parameters:
 		- tests
 	excludePaths:
 		- tests/fixtures
+	scanFiles:
+		- stubs/wordpress-7.0.php

@@ -8,7 +8,7 @@ use Vite\Exception;
 use Vite\Manifest;
 
 final class ManifestTest extends TestCase {
-	private const FIXTURE = __DIR__ . '/fixtures/wp-vite.php';
+	private const FIXTURE = __DIR__ . '/fixtures/demo/build/wp-vite.php';
 
 	public function test_load_returns_null_when_the_file_is_missing(): void {
 		self::assertNull( Manifest::load( __DIR__ . '/fixtures/missing.php' ) );
