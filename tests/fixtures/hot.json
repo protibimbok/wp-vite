@@ -1,0 +1,20 @@
+{
+	"origin": "http://localhost:5173/",
+	"srcDir": "src",
+	"refresh": true,
+	"entries": {
+		"blocks/counter/index": {
+			"url": "http://localhost:5173/src/blocks/counter/index.tsx",
+			"scripts": ["wp-blocks", "react-jsx-runtime"],
+			"modules": [],
+			"styles": ["src/blocks/counter/editor.scss"]
+		},
+		"admin/index": {
+			"url": "http://localhost:5173/src/admin/index.tsx"
+		}
+	},
+	"blocks": [
+		{ "name": "demo/counter", "dir": "blocks/counter" },
+		{ "bogus": true }
+	]
+}

@@ -1,0 +1,36 @@
+{
+	"name": "protibimbok/wp-vite",
+	"description": "Enqueue Vite-built WordPress plugin assets through the Script Modules API, with dev-server support.",
+	"type": "library",
+	"license": "GPL-2.0-or-later",
+	"keywords": [ "wordpress", "vite", "script-modules" ],
+	"require": {
+		"php": ">=8.1"
+	},
+	"require-dev": {
+		"brain/monkey": "^2.6",
+		"php-stubs/wordpress-stubs": "^6.7",
+		"phpstan/phpstan": "^2.1",
+		"phpunit/phpunit": "^11.5 || ^12.0",
+		"szepeviktor/phpstan-wordpress": "^2.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"Vite\\": "src/"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"Vite\\Tests\\": "tests/"
+		}
+	},
+	"scripts": {
+		"test": "phpunit",
+		"phpstan": "phpstan analyse"
+	},
+	"config": {
+		"sort-packages": true
+	},
+	"minimum-stability": "stable",
+	"prefer-stable": true
+}
