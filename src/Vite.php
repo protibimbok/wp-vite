@@ -13,12 +13,14 @@ final class Vite {
 	private ?Manifest $manifest = null;
 	private ?ScriptModules $modules = null;
 	private ?Styles $styles = null;
+	private ?Blocks $blocks = null;
 	private ?Translations $translations = null;
 
 	private function __construct(
 		private readonly string $file,
 		private readonly string $manifestFile,
 		private readonly string $hotFile,
+		private readonly string $buildPath,
 		private readonly string $buildDir,
 		private readonly string $prefix,
 	) {
@@ -41,6 +43,7 @@ final class Vite {
 			$file,
 			$manifest,
 			$hotFile ?? $build . '/.wp-vite/hot.json',
+			$build,
 			ltrim( substr( $build, strlen( $dir ) ), '/' ),
 			$prefix ?? basename( $dir )
 		);
@@ -101,6 +104,15 @@ final class Vite {
 		return $id;
 	}
 
+	/**
+	 * Registers every block of the build from its built `block.json`. Call on `init`.
+	 *
+	 * Uses `blocks-manifest.php` as a block metadata collection when the build wrote one.
+	 */
+	public function register_blocks(): void {
+		$this->blocks()->register();
+	}
+
 	/** @return list<string> Style handles of the entry's stylesheets. */
 	public function register_style( string $entry ): array {
 		return $this->styles()->register( $entry );
@@ -140,6 +152,10 @@ final class Vite {
 
 	private function styles(): Styles {
 		return $this->styles ??= new Styles( $this->manifest(), $this->url( ... ), $this->prefix );
+	}
+
+	private function blocks(): Blocks {
+		return $this->blocks ??= new Blocks( $this->manifest(), $this->buildPath, function_exists( 'wp_register_block_types_from_metadata_collection' ) );
 	}
 
 	// wp_register_script_module() gained $args in WordPress 6.9.

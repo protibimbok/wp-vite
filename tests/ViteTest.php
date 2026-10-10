@@ -95,6 +95,17 @@ final class ViteTest extends WordPressTestCase {
 		self::assertCount( 6, $calls );
 	}
 
+	public function test_register_blocks_uses_the_build_directory(): void {
+		$calls = array();
+		$this->record( 'wp_register_block_types_from_metadata_collection', $calls );
+		$this->record( 'wp_register_block_metadata_collection', $calls );
+		$this->record( 'register_block_type', $calls );
+		$this->vite()->register_blocks();
+		// With or without the 6.8 API the first call names the collection directory and manifest.
+		$build = dirname( self::PLUGIN_FILE ) . '/build';
+		self::assertSame( array( $build . '/blocks', $build . '/blocks-manifest.php' ), $calls[0] );
+	}
+
 	public function test_add_module_data_merges_into_the_filter(): void {
 		Functions\when( 'wp_register_script_module' )->justReturn();
 		$callbacks = array();
