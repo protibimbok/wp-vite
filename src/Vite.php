@@ -13,8 +13,10 @@ final class Vite {
 	private ?Manifest $manifest = null;
 	private ?ScriptModules $modules = null;
 	private ?Styles $styles = null;
-	private ?Blocks $blocks = null;
+	private Blocks|DevBlocks|null $blocks = null;
 	private ?Translations $translations = null;
+	private DevServer|false|null $dev = null;
+	private ?DevClient $client = null;
 
 	private function __construct(
 		private readonly string $file,
@@ -60,9 +62,10 @@ final class Vite {
 			?? throw new Exception( sprintf( 'wp-vite manifest %s not found. Run the build.', $this->manifestFile ) );
 	}
 
-	/** The running dev server, or null when there is none. */
+	/** The running dev server, or null when there is none. Read once per request. */
 	public function dev(): ?DevServer {
-		return DevServer::load( $this->hotFile );
+		$this->dev ??= DevServer::load( $this->hotFile ) ?? false;
+		return $this->dev ?: null;
 	}
 
 	/** Build directory relative to the plugin directory ('' when they are the same). */
@@ -142,25 +145,47 @@ final class Vite {
 	 */
 	public function set_translations( string $entry, string $domain, string $path = '' ): void {
 		$this->modules()->register( $entry );
-		$this->translations ??= new Translations( $this->buildDir, function_exists( 'wp_set_script_module_translations' ) );
+		// Core derives the JSON file name from the module URL, which is the dev server's in dev mode.
+		$this->translations ??= new Translations( $this->buildDir, function_exists( 'wp_set_script_module_translations' ) && $this->dev() === null );
 		$this->translations->set( $this->modules()->files( $entry ), $domain, $path );
 	}
 
 	private function modules(): ScriptModules {
-		return $this->modules ??= new ScriptModules( $this->manifest(), $this->url( ... ), $this->prefix, self::supports_args() );
+		return $this->modules ??= new ScriptModules( $this->manifest(), $this->url( ... ), $this->prefix, self::supports_args(), $this->dev_mode() );
 	}
 
 	private function styles(): Styles {
-		return $this->styles ??= new Styles( $this->manifest(), $this->url( ... ), $this->prefix );
+		return $this->styles ??= new Styles( $this->manifest(), $this->url( ... ), $this->prefix, $this->dev_mode() );
 	}
 
-	private function blocks(): Blocks {
-		return $this->blocks ??= new Blocks( $this->manifest(), $this->buildPath, function_exists( 'wp_register_block_types_from_metadata_collection' ) );
+	private function blocks(): Blocks|DevBlocks {
+		if ( $this->blocks === null ) {
+			$dev          = $this->dev_mode();
+			$this->blocks = $dev === null
+				? new Blocks( $this->manifest(), $this->buildPath, function_exists( 'wp_register_block_types_from_metadata_collection' ) )
+				: new DevBlocks( $dev, $this->buildPath, $this->modules(), $this->styles(), self::supports_client_navigation() );
+		}
+		return $this->blocks;
+	}
+
+	/** The dev server when one runs; its client is enqueued on the first use of the API. */
+	private function dev_mode(): ?DevServer {
+		$dev = $this->dev();
+		if ( $dev !== null ) {
+			$this->client ??= new DevClient( $dev, $this->prefix, defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG );
+			$this->client->enqueue();
+		}
+		return $dev;
 	}
 
 	// wp_register_script_module() gained $args in WordPress 6.9.
 	private static function supports_args(): bool {
 		return ( new \ReflectionFunction( 'wp_register_script_module' ) )->getNumberOfParameters() >= 5;
+	}
+
+	// WP_Interactivity_API::add_client_navigation_support_to_script_module() arrived in WordPress 6.9.
+	private static function supports_client_navigation(): bool {
+		return class_exists( \WP_Interactivity_API::class ) && ( new \ReflectionClass( \WP_Interactivity_API::class ) )->hasMethod( 'add_client_navigation_support_to_script_module' );
 	}
 
 	private static function normalize( string $path ): string {

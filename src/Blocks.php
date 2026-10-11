@@ -56,17 +56,21 @@ final class Blocks {
 	 */
 	private function enqueue_classic_deps_on_render( array $blocks ): void {
 		foreach ( $blocks as $block ) {
-			$scripts = $this->manifest->blockEntry( $block['name'], 'viewScriptModule' )['scripts'] ?? array();
-			if ( $scripts === array() ) {
-				continue;
-			}
-			add_filter( "render_block_{$block['name']}", static function ( mixed $content ) use ( $scripts ): mixed {
-				foreach ( $scripts as $handle ) {
-					wp_enqueue_script( $handle );
-				}
-				return $content;
-			} );
+			self::enqueue_scripts_on_render( $block['name'], $this->manifest->blockEntry( $block['name'], 'viewScriptModule' )['scripts'] ?? array() );
 		}
+	}
+
+	/** @param list<string> $scripts Classic script handles. */
+	public static function enqueue_scripts_on_render( string $block, array $scripts ): void {
+		if ( $scripts === array() ) {
+			return;
+		}
+		add_filter( "render_block_{$block}", static function ( mixed $content ) use ( $scripts ): mixed {
+			foreach ( $scripts as $handle ) {
+				wp_enqueue_script( $handle );
+			}
+			return $content;
+		} );
 	}
 
 	private function path( string $dir ): string {

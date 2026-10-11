@@ -3,7 +3,13 @@ declare( strict_types=1 );
 
 namespace Vite;
 
-/** Registers the stylesheets of manifest entries (entry CSS plus the CSS of statically imported chunks). */
+/**
+ * Registers the stylesheets of manifest entries (entry CSS plus the CSS of statically imported chunks).
+ *
+ * While the dev server runs, a served stylesheet entry registers as one `<link>` to its dev URL, which
+ * Vite's client swaps in place on change; a served script module registers no styles, since Vite
+ * injects the stylesheets it imports itself.
+ */
 final class Styles {
 	/** @var array<string, true> */
 	private array $registered = array();
@@ -13,6 +19,7 @@ final class Styles {
 		private readonly Manifest $manifest,
 		private readonly \Closure $url,
 		private readonly string $prefix,
+		private readonly ?DevServer $dev = null,
 	) {
 	}
 
@@ -23,6 +30,10 @@ final class Styles {
 
 	/** @return list<string> Handles in load order. */
 	public function register( string $entry ): array {
+		$dev = $this->dev?->entry( $entry );
+		if ( $dev !== null ) {
+			return $dev['format'] === 'css' ? array( $this->register_dev( $entry, $dev['url'] ) ) : array();
+		}
 		$item = $this->manifest->entry( $entry )
 			?? throw new Exception( sprintf( 'wp-vite entry "%s" is not in the manifest.', $entry ) );
 		$handles = array();
@@ -47,5 +58,14 @@ final class Styles {
 			wp_enqueue_style( $handle );
 		}
 		return $handles;
+	}
+
+	private function register_dev( string $entry, string $url ): string {
+		$handle = $this->handle( $entry );
+		if ( ! isset( $this->registered[ $handle ] ) ) {
+			$this->registered[ $handle ] = true;
+			wp_register_style( $handle, $url, array(), null );
+		}
+		return $handle;
 	}
 }

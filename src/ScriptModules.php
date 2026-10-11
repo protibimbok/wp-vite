@@ -7,7 +7,9 @@ namespace Vite;
  * Registers manifest entries and their chunks with WP_Script_Modules.
  *
  * Chunks are registered as module dependencies (static or dynamic, as imported), so core prints
- * `modulepreload` links for the static ones and puts every module id in the import map.
+ * `modulepreload` links for the static ones and puts every module id in the import map. While the
+ * dev server runs, entries it serves register from their dev URL instead, with the hot file's module
+ * ids as static dependencies.
  */
 final class ScriptModules {
 	/** @var array<string, true> */
@@ -19,6 +21,7 @@ final class ScriptModules {
 		private readonly \Closure $url,
 		private readonly string $prefix,
 		private readonly bool $supportsArgs,
+		private readonly ?DevServer $dev = null,
 	) {
 	}
 
@@ -31,13 +34,19 @@ final class ScriptModules {
 	 * @return string The module id.
 	 */
 	public function register( string $entry, array $args = array() ): string {
-		$item = $this->entry( $entry );
-		$id   = $this->id( $entry );
+		$id = $this->id( $entry );
 		if ( isset( $this->registered[ $id ] ) ) {
 			return $id;
 		}
+		$dev = $this->dev_entry( $entry );
+		if ( $dev !== null ) {
+			$this->registered[ $id ] = true;
+			$this->add( $id, $dev['url'], $dev['modules'], null, $args );
+			return $id;
+		}
+		$item                    = $this->entry( $entry );
 		$this->registered[ $id ] = true;
-		$this->add( $id, $item['file'], $this->deps( $item ), $item['version'], $args );
+		$this->add( $id, ( $this->url )( $item['file'] ), $this->deps( $item ), $item['version'], $args );
 		return $id;
 	}
 
@@ -50,10 +59,15 @@ final class ScriptModules {
 	public function enqueue( string $entry, array $args = array() ): string {
 		$id = $this->register( $entry, $args );
 		wp_enqueue_script_module( $id );
-		foreach ( $this->entry( $entry )['scripts'] as $handle ) {
+		foreach ( $this->scripts( $entry ) as $handle ) {
 			wp_enqueue_script( $handle );
 		}
 		return $id;
+	}
+
+	/** @return list<string> Classic script handles the entry needs. */
+	public function scripts( string $entry ): array {
+		return ( $this->dev_entry( $entry ) ?? $this->entry( $entry ) )['scripts'];
 	}
 
 	/**
@@ -68,6 +82,12 @@ final class ScriptModules {
 			$files[ $this->chunk_id( $file ) ] = $file;
 		}
 		return $files;
+	}
+
+	/** @return array<string, mixed>|null The served script module entry; null in production or for a stylesheet entry. */
+	private function dev_entry( string $name ): ?array {
+		$item = $this->dev?->entry( $name );
+		return $item !== null && $item['format'] === 'es' ? $item : null;
 	}
 
 	/** @return array<string, mixed> */
@@ -113,7 +133,7 @@ final class ScriptModules {
 			?? throw new Exception( sprintf( 'wp-vite chunk "%s" is not in the manifest.', $file ) );
 		// Marked before recursing so circular chunk imports terminate.
 		$this->registered[ $id ] = true;
-		$this->add( $id, $file, $this->deps( $chunk ), $chunk['version'] );
+		$this->add( $id, ( $this->url )( $file ), $this->deps( $chunk ), $chunk['version'] );
 		return $id;
 	}
 
@@ -125,8 +145,7 @@ final class ScriptModules {
 	 * @param list<string|array{id: string, import: string}> $deps
 	 * @param array<string, mixed>                           $args
 	 */
-	private function add( string $id, string $file, array $deps, string $version, array $args = array() ): void {
-		$src = ( $this->url )( $file );
+	private function add( string $id, string $src, array $deps, ?string $version, array $args = array() ): void {
 		if ( $args !== array() && $this->supportsArgs ) {
 			wp_register_script_module( $id, $src, $deps, $version, $args );
 		} else {

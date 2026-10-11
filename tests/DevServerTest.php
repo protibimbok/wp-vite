@@ -49,7 +49,21 @@ final class DevServerTest extends TestCase {
 		self::assertSame( 'http://localhost:5173', $dev->origin() );
 		self::assertSame( 'src', $dev->srcDir() );
 		self::assertTrue( $dev->refresh() );
-		self::assertSame( array( array( 'name' => 'demo/counter', 'dir' => 'blocks/counter' ) ), $dev->blocks() );
+		self::assertSame(
+			array(
+				array(
+					'name'   => 'demo/counter',
+					'dir'    => 'src/blocks/counter',
+					'fields' => array(
+						'viewScriptModule' => array( 'blocks/counter/view' ),
+						'style'            => array( 'blocks/counter/style' ),
+						'editorStyle'      => array( 'blocks/counter/editor' ),
+					),
+				),
+				array( 'name' => 'demo/other', 'dir' => 'src/blocks/other', 'fields' => array() ),
+			),
+			$dev->blocks()
+		);
 	}
 
 	public function test_entries_are_normalised(): void {
@@ -59,16 +73,21 @@ final class DevServerTest extends TestCase {
 		self::assertNull( $dev->entry( 'frontend/index' ) );
 		self::assertSame(
 			array(
-				'url'     => 'http://localhost:5173/src/blocks/counter/index.tsx',
-				'scripts' => array( 'wp-blocks', 'react-jsx-runtime' ),
-				'modules' => array(),
-				'styles'  => array( 'src/blocks/counter/editor.scss' ),
+				'url'     => 'http://localhost:5173/src/blocks/counter/view.ts',
+				'src'     => 'src/blocks/counter/view.ts',
+				'format'  => 'es',
+				'scripts' => array( 'wp-i18n' ),
+				'modules' => array( '@wordpress/interactivity' ),
+				'styles'  => array(),
 			),
-			$dev->entry( 'blocks/counter/index' )
+			$dev->entry( 'blocks/counter/view' )
 		);
+		self::assertSame( 'css', $dev->entry( 'blocks/counter/style' )['format'] ?? null );
 		self::assertSame(
 			array(
 				'url'     => 'http://localhost:5173/src/admin/index.tsx',
+				'src'     => '',
+				'format'  => 'es',
 				'scripts' => array(),
 				'modules' => array(),
 				'styles'  => array(),

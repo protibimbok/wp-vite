@@ -3,18 +3,42 @@
 	"srcDir": "src",
 	"refresh": true,
 	"entries": {
-		"blocks/counter/index": {
-			"url": "http://localhost:5173/src/blocks/counter/index.tsx",
-			"scripts": ["wp-blocks", "react-jsx-runtime"],
-			"modules": [],
-			"styles": ["src/blocks/counter/editor.scss"]
+		"blocks/counter/view": {
+			"url": "http://localhost:5173/src/blocks/counter/view.ts",
+			"src": "src/blocks/counter/view.ts",
+			"format": "es",
+			"scripts": ["wp-i18n"],
+			"modules": ["@wordpress/interactivity"],
+			"styles": []
+		},
+		"blocks/counter/style": {
+			"url": "http://localhost:5173/src/blocks/counter/style.scss",
+			"src": "src/blocks/counter/style.scss",
+			"format": "css",
+			"scripts": [], "modules": [], "styles": []
+		},
+		"blocks/counter/editor": {
+			"url": "http://localhost:5173/src/blocks/counter/editor.scss",
+			"src": "src/blocks/counter/editor.scss",
+			"format": "css",
+			"scripts": [], "modules": [], "styles": []
 		},
 		"admin/index": {
 			"url": "http://localhost:5173/src/admin/index.tsx"
 		}
 	},
 	"blocks": [
-		{ "name": "demo/counter", "dir": "blocks/counter" },
+		{
+			"name": "demo/counter",
+			"dir": "src/blocks/counter",
+			"fields": {
+				"viewScriptModule": ["blocks/counter/view"],
+				"style": ["blocks/counter/style"],
+				"editorStyle": ["blocks/counter/editor"],
+				"bogus": [1]
+			}
+		},
+		{ "name": "demo/other", "dir": "src/blocks/other" },
 		{ "bogus": true }
 	]
 }

@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace Vite\Tests;
 
+use Vite\DevServer;
 use Vite\Exception;
 use Vite\Manifest;
 use Vite\Styles;
@@ -74,9 +75,35 @@ final class StylesTest extends WordPressTestCase {
 		$this->styles()->register( 'nope' );
 	}
 
-	private function styles(): Styles {
+	public function test_dev_stylesheet_entries_register_one_unversioned_link(): void {
+		$styles = $this->styles( true );
+		self::assertSame( array( 'demo-blocks-counter-style' ), $styles->enqueue( 'blocks/counter/style' ) );
+		self::assertSame( array( 'demo-blocks-counter-style' ), $styles->register( 'blocks/counter/style' ) );
+		self::assertSame( array( array( 'demo-blocks-counter-style', 'http://localhost:5173/src/blocks/counter/style.scss', array(), null ) ), $this->registered );
+		self::assertSame( array(), $this->data, 'no rtl variants on the dev server' );
+		self::assertSame( array( array( 'demo-blocks-counter-style' ) ), $this->enqueued );
+	}
+
+	public function test_dev_script_modules_register_no_styles(): void {
+		self::assertSame( array(), $this->styles( true )->enqueue( 'admin/index' ) );
+		self::assertSame( array(), $this->registered );
+	}
+
+	public function test_entries_the_dev_server_does_not_serve_register_from_the_manifest(): void {
+		$data = json_decode( (string) file_get_contents( __DIR__ . '/fixtures/hot.json' ), true );
+		self::assertIsArray( $data );
+		unset( $data['entries']['admin/index'] );
+		$styles = $this->styles( true, DevServer::fromArray( $data ) );
+		self::assertSame( array( 'demo-admin-index', 'demo-admin-style-index' ), $styles->register( 'admin/index' ) );
+	}
+
+	private function styles( bool $dev = false, ?DevServer $server = null ): Styles {
 		$manifest = Manifest::load( __DIR__ . '/fixtures/demo/build/wp-vite.php' );
 		self::assertNotNull( $manifest );
-		return new Styles( $manifest, static fn( string $file ): string => 'https://example.test/build/' . $file, 'demo' );
+		if ( $dev ) {
+			$server ??= DevServer::load( __DIR__ . '/fixtures/hot.json' );
+			self::assertNotNull( $server );
+		}
+		return new Styles( $manifest, static fn( string $file ): string => 'https://example.test/build/' . $file, 'demo', $server );
 	}
 }

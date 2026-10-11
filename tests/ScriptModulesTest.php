@@ -4,6 +4,7 @@ declare( strict_types=1 );
 namespace Vite\Tests;
 
 use Brain\Monkey\Functions;
+use Vite\DevServer;
 use Vite\Exception;
 use Vite\Manifest;
 use Vite\ScriptModules;
@@ -128,10 +129,50 @@ final class ScriptModulesTest extends WordPressTestCase {
 		$this->modules( $manifest )->register( 'a' );
 	}
 
-	private function modules( ?Manifest $manifest = null, bool $supportsArgs = false ): ScriptModules {
+	public function test_dev_entries_register_from_the_dev_server_with_module_deps(): void {
+		$id = $this->dev_modules()->register( 'blocks/counter/view', array( 'in_footer' => true ) );
+		self::assertSame( 'demo/blocks/counter/view', $id );
+		self::assertSame(
+			array( array( 'demo/blocks/counter/view', 'http://localhost:5173/src/blocks/counter/view.ts', array( '@wordpress/interactivity' ), null, array( 'in_footer' => true ) ) ),
+			$this->registered
+		);
+	}
+
+	public function test_dev_enqueue_uses_the_hot_file_scripts(): void {
+		$this->dev_modules()->enqueue( 'blocks/counter/view' );
+		self::assertSame( array( array( 'demo/blocks/counter/view' ) ), $this->enqueued );
+		self::assertSame( array( array( 'wp-i18n' ) ), $this->scripts );
+	}
+
+	public function test_entries_the_dev_server_does_not_serve_register_from_the_manifest(): void {
+		$modules = $this->dev_modules();
+		$modules->register( 'admin/index' );
+		$modules->register( 'blocks/counter/view' );
+		self::assertSame(
+			array( 'https://example.test/build/chunks/shared-abc123.js', 'https://example.test/build/admin/index.js', 'http://localhost:5173/src/blocks/counter/view.ts' ),
+			array_column( $this->registered, 1 )
+		);
+	}
+
+	public function test_dev_stylesheet_entries_are_not_script_modules(): void {
+		$this->expectException( Exception::class );
+		$this->expectExceptionMessage( 'entry "blocks/counter/style" is not in the manifest' );
+		$this->dev_modules()->register( 'blocks/counter/style' );
+	}
+
+	private function modules( ?Manifest $manifest = null, bool $supportsArgs = false, ?DevServer $dev = null ): ScriptModules {
 		$manifest ??= Manifest::load( __DIR__ . '/fixtures/demo/build/wp-vite.php' );
 		self::assertNotNull( $manifest );
-		return new ScriptModules( $manifest, static fn( string $file ): string => 'https://example.test/build/' . $file, 'demo', $supportsArgs );
+		return new ScriptModules( $manifest, static fn( string $file ): string => 'https://example.test/build/' . $file, 'demo', $supportsArgs, $dev );
+	}
+
+	// The fixture hot file serves `blocks/counter/view` but lists `admin/index` without deps, so the
+	// latter stands in for an entry the dev server knows nothing about once its hot entry is removed.
+	private function dev_modules(): ScriptModules {
+		$data = json_decode( (string) file_get_contents( __DIR__ . '/fixtures/hot.json' ), true );
+		self::assertIsArray( $data );
+		unset( $data['entries']['admin/index'] );
+		return $this->modules( null, true, DevServer::fromArray( $data ) );
 	}
 
 	/**

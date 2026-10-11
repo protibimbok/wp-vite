@@ -6,7 +6,10 @@ namespace Vite;
 /**
  * Reader for the hot file `build/.wp-vite/hot.json` that `wp-vite start` writes while the dev server runs.
  *
- * Each entry is normalised to `{url, scripts, modules, styles}`; the three lists default to empty.
+ * It lists what the dev server serves: script modules (`format: 'es'`) and stylesheets (`format: 'css'`).
+ * Classic block scripts are watch-built into the build directory and never appear here. Each entry is
+ * normalised to `{url, src, format, scripts, modules, styles}`; each block to `{name, dir, fields}` where
+ * `fields` maps a served block.json field to the entry names it references.
  */
 final class DevServer {
 	/** @param array<string, mixed> $data */
@@ -49,6 +52,8 @@ final class DevServer {
 			}
 			$entries[ (string) $name ] = array(
 				'url'     => $entry['url'],
+				'src'     => is_string( $entry['src'] ?? null ) ? $entry['src'] : '',
+				'format'  => ( $entry['format'] ?? null ) === 'css' ? 'css' : 'es',
 				'scripts' => self::strings( $entry['scripts'] ?? array() ),
 				'modules' => self::strings( $entry['modules'] ?? array() ),
 				'styles'  => self::strings( $entry['styles'] ?? array() ),
@@ -56,9 +61,17 @@ final class DevServer {
 		}
 		$blocks = array();
 		foreach ( is_array( $data['blocks'] ?? null ) ? $data['blocks'] : array() as $block ) {
-			if ( is_array( $block ) && is_string( $block['name'] ?? null ) && is_string( $block['dir'] ?? null ) ) {
-				$blocks[] = array( 'name' => $block['name'], 'dir' => $block['dir'] );
+			if ( ! is_array( $block ) || ! is_string( $block['name'] ?? null ) || ! is_string( $block['dir'] ?? null ) ) {
+				continue;
 			}
+			$fields = array();
+			foreach ( is_array( $block['fields'] ?? null ) ? $block['fields'] : array() as $field => $names ) {
+				$names = self::strings( $names );
+				if ( $names !== array() ) {
+					$fields[ (string) $field ] = $names;
+				}
+			}
+			$blocks[] = array( 'name' => $block['name'], 'dir' => $block['dir'], 'fields' => $fields );
 		}
 		return new self( array(
 			'origin'  => rtrim( $origin, '/' ),
@@ -79,12 +92,12 @@ final class DevServer {
 		return $this->data['srcDir'];
 	}
 
-	/** Whether React Fast Refresh is on (the preamble must load before any entry). */
+	/** Whether React Fast Refresh is on (`@vitejs/plugin-react` is configured). */
 	public function refresh(): bool {
 		return $this->data['refresh'];
 	}
 
-	/** @return array<string, array<string, mixed>> Entries keyed by name. */
+	/** @return array<string, array<string, mixed>> Served entries keyed by name. */
 	public function entries(): array {
 		return $this->data['entries'];
 	}
@@ -98,7 +111,7 @@ final class DevServer {
 		return $this->data['entries'][ $name ] ?? null;
 	}
 
-	/** @return list<array{name: string, dir: string}> */
+	/** @return list<array{name: string, dir: string, fields: array<string, list<string>>}> Blocks with `dir` relative to the plugin root. */
 	public function blocks(): array {
 		return $this->data['blocks'];
 	}

@@ -3,6 +3,7 @@ declare( strict_types=1 );
 
 namespace Vite\Tests;
 
+use Brain\Monkey\Actions;
 use Brain\Monkey\Filters;
 use Brain\Monkey\Functions;
 use Vite\Exception;
@@ -130,6 +131,55 @@ final class ViteTest extends WordPressTestCase {
 		$this->record( 'wp_set_script_module_translations', $calls );
 		$this->vite()->set_translations( 'admin/index', 'demo', '/lang' );
 		self::assertSame( array( 'demo/admin/index', 'demo/chunks/shared-abc123.js' ), array_column( $calls, 0 ) );
+	}
+
+	public function test_dev_mode_enqueues_the_client_and_serves_entries_from_the_dev_server(): void {
+		$calls = array();
+		$this->record( 'wp_register_script_module', $calls );
+		$this->record( 'wp_enqueue_script_module', $calls );
+		$this->record( 'wp_enqueue_script', $calls );
+		Functions\expect( 'wp_register_style' )->never();
+		Actions\expectAdded( 'admin_notices' )->once();
+
+		$vite = Vite::init( self::PLUGIN_FILE, null, __DIR__ . '/fixtures/hot.json' );
+		self::assertNotNull( $vite->dev() );
+		self::assertSame( 'demo/admin/index', $vite->enqueue_script_module( 'admin/index' ) );
+		self::assertSame(
+			array(
+				array( 'demo/vite-client', 'http://localhost:5173/@vite/client', array(), null ),
+				array( 'demo/vite-client' ),
+				array( 'demo/admin/index', 'http://localhost:5173/src/admin/index.tsx', array(), null ),
+				array( 'demo/admin/index' ),
+			),
+			$calls
+		);
+	}
+
+	public function test_dev_mode_registers_blocks_through_the_hot_file(): void {
+		Functions\when( 'wp_register_script_module' )->justReturn();
+		Functions\when( 'wp_enqueue_script_module' )->justReturn();
+		Actions\expectAdded( 'admin_notices' )->once();
+		Filters\expectAdded( 'block_type_metadata' )->once();
+		Filters\expectAdded( 'block_type_metadata_settings' )->once();
+		Filters\expectAdded( 'render_block_demo/counter' )->once();
+		$calls = array();
+		$this->record( 'wp_register_block_metadata_collection', $calls );
+		$this->record( 'register_block_type', $calls );
+
+		Vite::init( self::PLUGIN_FILE, null, __DIR__ . '/fixtures/hot.json' )->register_blocks();
+		$build = dirname( self::PLUGIN_FILE ) . '/build';
+		self::assertSame( array( array( $build, $build . '/blocks-manifest.php' ), array( $build . '/blocks/counter' ), array( $build . '/blocks/other' ) ), $calls );
+	}
+
+	public function test_dev_mode_translations_use_the_built_files(): void {
+		Functions\when( 'wp_register_script_module' )->justReturn();
+		Functions\when( 'wp_enqueue_script_module' )->justReturn();
+		Functions\when( 'determine_locale' )->justReturn( 'de_DE' );
+		Functions\when( 'load_script_translations' )->justReturn( false );
+		Functions\expect( 'wp_set_script_module_translations' )->never();
+		Actions\expectAdded( 'admin_notices' )->once();
+
+		Vite::init( self::PLUGIN_FILE, null, __DIR__ . '/fixtures/hot.json' )->set_translations( 'admin/index', 'demo', '/lang' );
 	}
 
 	private function vite(): Vite {
