@@ -146,7 +146,7 @@ final class ViteTest extends WordPressTestCase {
 		self::assertSame( 'demo/admin/index', $vite->enqueue_script_module( 'admin/index' ) );
 		self::assertSame(
 			array(
-				array( 'demo/vite-client', 'http://localhost:5173/@vite/client', array(), null ),
+				array( 'demo/vite-client', 'http://localhost:5173/@wp-vite/client', array(), null ),
 				array( 'demo/vite-client' ),
 				array( 'demo/admin/index', 'http://localhost:5173/src/admin/index.tsx', array(), null ),
 				array( 'demo/admin/index' ),

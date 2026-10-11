@@ -25,7 +25,7 @@ final class DevClientTest extends WordPressTestCase {
 		$client->enqueue();
 		self::assertSame(
 			array(
-				array( 'demo/vite-client', 'http://localhost:5173/@vite/client', array(), null ),
+				array( 'demo/vite-client', 'http://localhost:5173/@wp-vite/client', array(), null ),
 				array( 'demo/vite-client' ),
 			),
 			$this->calls

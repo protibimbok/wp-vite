@@ -4,8 +4,9 @@ declare( strict_types=1 );
 namespace Vite;
 
 /**
- * Vite's client module (`<origin>/@vite/client`), enqueued on every page in dev mode so that pages
- * receive full reloads after classic block scripts rebuild and stylesheet links get hot-swapped.
+ * The wp-vite dev client (`<origin>/@wp-vite/client`, which loads Vite's own client), enqueued on every
+ * page in dev mode so that pages receive full reloads after classic block scripts rebuild and
+ * stylesheet links get hot-swapped, including the copies inside the block editor's canvas iframe.
  */
 final class DevClient {
 	// react-refresh's stub devtools hook (core's wp-react-refresh-entry, loaded before React) does not
@@ -32,7 +33,7 @@ final class DevClient {
 			return;
 		}
 		$this->enqueued = true;
-		wp_register_script_module( $this->id(), $this->dev->url( '/@vite/client' ), array(), null );
+		wp_register_script_module( $this->id(), $this->dev->url( '/@wp-vite/client' ), array(), null );
 		wp_enqueue_script_module( $this->id() );
 		if ( ! $this->dev->refresh() ) {
 			return;
